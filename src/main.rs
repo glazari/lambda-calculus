@@ -1,5 +1,5 @@
-use std::io::{self, Write};
 use std::collections::HashSet;
+use std::io::{self, Write};
 
 fn main() {
     run();
@@ -9,11 +9,11 @@ fn tokenize(input: &str) -> Vec<&str> {
     input.split_whitespace().collect()
 }
 
-fn consts(term: &Term) -> HashSet<&str> { 
+fn consts(term: &Term) -> HashSet<&str> {
     let set = match term {
-        Term::True => set("true"), 
-        Term::False => set("false"), 
-        Term::Zero => set("0"), 
+        Term::True => set("true"),
+        Term::False => set("false"),
+        Term::Zero => set("0"),
         Term::If(t1, t2, t3) => {
             let mut s = consts(t1);
             s.extend(consts(t2).iter());
@@ -48,6 +48,42 @@ fn depth(term: &Term) -> usize {
         Term::Succ(t1) => 1 + depth(t1),
         Term::Pred(t1) => 1 + depth(t1),
         Term::IsZero(t1) => 1 + depth(t1),
+    }
+}
+
+fn eval(term: &Term) -> Result<Term, EvalError> {
+    let t = match term {
+        Term::True | Term::False | Term::Zero => term.clone(),
+        Term::If(t1, t2, t3) => match eval(t1)? {
+            Term::True => eval(t2)?,
+            Term::False => eval(t3)?,
+            _ => return Err(eval_err("Expected boolean", t1)),
+        },
+        Term::Succ(t1) => succ(eval(t1)?),
+        Term::Pred(t1) => match eval(t1)? {
+            Term::Zero => Term::Zero,
+            Term::Succ(t2) => eval(&t2)?,
+            _ => pred(eval(t1)?),
+        },
+        Term::IsZero(t1) => match eval(t1)? {
+            Term::Zero => Term::True,
+            Term::Succ(_) => Term::False,
+            _ => iszero(eval(t1)?),
+        },
+    };
+    Ok(t)
+}
+
+#[derive(Debug)]
+struct EvalError {
+    message: String,
+    term: Term,
+}
+
+fn eval_err(message: &str, term: &Term) -> EvalError {
+    EvalError {
+        message: message.to_string(),
+        term: term.clone(),
     }
 }
 
@@ -97,7 +133,7 @@ fn expect(tokens: &Vec<&str>, i: usize, expected: &str) -> Result<usize, ParseEr
 }
 
 // AST
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Term {
     True,
     False,
@@ -150,6 +186,11 @@ fn err(message: &str, offset: usize) -> ParseError {
     }
 }
 
+fn print_eval_error(e: EvalError) {
+    println!("Error: {}", e.message);
+    println!("{:?}", e.term);
+}
+
 // Repl
 fn run() {
     println!("Lambda REPL");
@@ -170,10 +211,17 @@ fn run() {
 
         let (t, _) = term.unwrap();
         println!("{:?}", t);
-        
+
         println!("consts: {:?}", consts(&t));
         println!("size: {:?}", size(&t));
         println!("depth: {:?}", depth(&t));
+        let result = eval(&t);
+        if result.is_err() {
+            print_eval_error(result.err().unwrap());
+            continue;
+        }
+
+        println!("evaluation result: {:?}", result.unwrap());
     }
 }
 

@@ -39,3 +39,6 @@ depth: 4
 
 >
 ```
+
+TODO:
+- check if is numeric value
