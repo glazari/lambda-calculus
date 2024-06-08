@@ -52,26 +52,67 @@ fn depth(term: &Term) -> usize {
 }
 
 fn eval(term: &Term) -> Result<Term, EvalError> {
+    let mut t = term.clone();
+    let mut prev = term.clone();
+    loop {
+        if isval(&t) {
+            return Ok(t.clone());
+        }
+        t = little_step_eval(&t)?;
+        if prev == t {
+            return Err(eval_err("No rule applies", &t));
+        }
+        prev = t.clone();
+    }
+}
+
+fn little_step_eval(term: &Term) -> Result<Term, EvalError> {
     let t = match term {
+        Term::If(t1,t2, t3) => {
+            match **t1 {
+                Term::True => *t2.clone(),
+                Term::False => *t3.clone(),
+                _ => if_(little_step_eval(t1)?, *t2.clone(), *t3.clone()),
+            }
+        }, 
+        Term::Succ(t1) => succ(little_step_eval(t1)?), 
+        Term::Pred(t1) => {
+            let t = *t1.clone();
+            match t {
+                Term::Zero => Term::Zero,
+                Term::Succ(t2) if isnumericval(&t2) => *t2.clone(),
+                _ => pred(little_step_eval(t1)?),
+            }
+        },
+        Term::IsZero(t1) => {
+            let t = *t1.clone();
+            match t {
+                Term::Zero => Term::True,
+                Term::Succ(t2) if isnumericval(&t2) => Term::False,
+                _ => iszero(little_step_eval(t1)?)
+            }
+        },
         Term::True | Term::False | Term::Zero => term.clone(),
-        Term::If(t1, t2, t3) => match eval(t1)? {
-            Term::True => eval(t2)?,
-            Term::False => eval(t3)?,
-            _ => return Err(eval_err("Expected boolean", t1)),
-        },
-        Term::Succ(t1) => succ(eval(t1)?),
-        Term::Pred(t1) => match eval(t1)? {
-            Term::Zero => Term::Zero,
-            Term::Succ(t2) => eval(&t2)?,
-            _ => pred(eval(t1)?),
-        },
-        Term::IsZero(t1) => match eval(t1)? {
-            Term::Zero => Term::True,
-            Term::Succ(_) => Term::False,
-            _ => iszero(eval(t1)?),
-        },
     };
     Ok(t)
+}
+
+
+
+fn isval(term: &Term) -> bool {
+    match term {
+        Term::True | Term::False | Term::Zero => true,
+        t if isnumericval(t) => true,
+        _ => false,
+    }
+}
+
+fn isnumericval(term: &Term) -> bool {
+    match term {
+        Term::Zero => true,
+        Term::Succ(t1) => isnumericval(t1),
+        _ => false,
+    }
 }
 
 #[derive(Debug)]
@@ -133,7 +174,7 @@ fn expect(tokens: &Vec<&str>, i: usize, expected: &str) -> Result<usize, ParseEr
 }
 
 // AST
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum Term {
     True,
     False,
