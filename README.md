@@ -40,5 +40,13 @@ depth: 4
 >
 ```
 
-TODO:
-- check if is numeric value
+# Untyped Lambda Calculus
+
+## Grammar
+
+```
+term ::= x
+       | λx. term
+       | \x. term
+       | term term
+```
