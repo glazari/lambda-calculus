@@ -1,32 +1,44 @@
 use crate::colors::*;
 use std::collections::HashSet;
 
-use crate::Evaluator;
+use crate::evaluator::Evaluator;
 
+#[derive(Debug)]
 pub struct UntypedArithmetic;
 
 impl Evaluator for UntypedArithmetic {
-    fn run(&self, input: &str) {
+    fn run(&self, input: &str) -> String {
         let tokens = tokenize(input);
         let term = parser(&tokens, 0);
+        let mut output = String::new();
         if term.is_err() {
-            print_parse_error(term.err().unwrap(), input);
-            return;
+            let err = parse_error_to_string(term.err().unwrap(), input);
+            output.push_str(err.as_str());
+            return output;
         }
 
         let (t, _) = term.unwrap();
-        println!("{:?}", t);
+        output.push_str(format!("{:?}\n", t).as_str());
+        output.push_str(format!("consts: {:?}\n", consts(&t)).as_str());
+        output.push_str(format!("size: {:?}\n", size(&t)).as_str());
+        output.push_str(format!("depth: {:?}\n", depth(&t)).as_str());
 
-        println!("consts: {:?}", consts(&t));
-        println!("size: {:?}", size(&t));
-        println!("depth: {:?}", depth(&t));
         let result = eval(&t);
         if result.is_err() {
-            print_eval_error(result.err().unwrap());
-            return;
+            let err = eval_error_to_string(result.err().unwrap());
+            output.push_str(err.as_str());
+            return output;
         }
 
-        println!("evaluation result: {:?}", result.unwrap());
+        output.push_str("evaluation result: ");
+        output.push_str(format!("{:?}\n", result.unwrap()).as_str());
+        output
+    }
+    fn __debug__(&self) -> String {
+        format!("{:?}", self)
+    }
+    fn name(&self) -> String {
+        "Untyped Arithmetic".to_string()
     }
 }
 
@@ -225,20 +237,26 @@ struct ParseError {
     offset: usize,
 }
 
-fn print_parse_error(e: ParseError, input: &str) {
-    println!("Error: {}", e.message);
+
+
+fn parse_error_to_string(e: ParseError, input: &str) -> String {
+    let mut out = String::new();
+    out.push_str(format!("Error: {}\n", e.message).as_str());
     let tokens = tokenize(input);
-    print!("{}{}", CYAN, tokens[..e.offset].join(" "));
+    out.push_str(format!("{}{}", CYAN, tokens[..e.offset].join(" ")).as_str());
     if e.offset > 0 {
-        print!(" ");
+        out.push_str(" ");
     }
-    println!("{}{}{}", RED, tokens[e.offset], RESET);
+    out.push_str(format!("{}{}{}\n", RED, tokens[e.offset], RESET).as_str());
     for i in 0..e.offset {
         let spaces = tokens[i].len();
-        print!("{:width$} ", "", width = spaces);
+        out.push_str(format!("{:width$} ", "", width = spaces).as_str());
     }
     // ^^^ for the length of the token
-    println!("{}{}{}", RED, "^".repeat(tokens[e.offset].len()), RESET);
+    out.push_str(format!("{}{}", RED, "^".repeat(tokens[e.offset].len())).as_str());
+    out.push_str(RESET);
+    out.push_str("\n");
+    out
 }
 
 fn err(message: &str, offset: usize) -> ParseError {
@@ -248,7 +266,9 @@ fn err(message: &str, offset: usize) -> ParseError {
     }
 }
 
-fn print_eval_error(e: EvalError) {
-    println!("Error: {}", e.message);
-    println!("{:?}", e.term);
+fn eval_error_to_string(e: EvalError) -> String {
+    let mut out = String::new();
+    out.push_str(format!("Error: {}\n", e.message).as_str());
+    out.push_str(format!("{:?}\n", e.term).as_str());
+    out
 }

@@ -1,47 +1,55 @@
 use crate::colors::*;
-use crate::Evaluator;
+use crate::evaluator::Evaluator;
 
 use std::fmt::{self, Display, Formatter};
 
+#[derive(Debug)]
 pub struct UntypedLambdaCalculus;
 
 impl Evaluator for UntypedLambdaCalculus {
-    fn run(&self, input: &str) {
-        println!("Untyped Lambda Calculus");
-
-        println!("input: {:?}", input);
+    fn run(&self, input: &str) -> String {
+        let mut out = String::new();
+        out.push_str("input: ");
+        out.push_str(input);
+        out.push_str("\n");
         let tokens = tokenize(input);
         if tokens.is_err() {
-            print_tokenize_error(tokens.err().unwrap(), input);
-            return;
+            let err = tokenize_error_to_string(tokens.err().unwrap(), input);
+            out.push_str(err.as_str());
+            return out;
         }
         let tokens = tokens.unwrap();
-        let mut string = String::new();
-        string.push_str("tokens: [");
+        out.push_str("tokens: [");
         for token in &tokens {
-            string.push_str(&format!("{}, ", token));
+            out.push_str(&format!("{}, ", token));
         }
-        string.push_str("]");
-        println!("{}", string);
+        out.push_str("]\n");
 
         let term = parse(&tokens);
         if term.is_err() {
-            print_parse_error(term.err().unwrap(), input);
-            return;
+            let err = parse_error_to_string(term.err().unwrap(), input);
+            out.push_str(err.as_str());
+            return out;
         }
         let term = term.unwrap();
-        println!("parsed: {:?}", term);
-        println!("{}", term);
-
+        out.push_str("parsed: ");
+        out.push_str(&format!("{}\n", term));
+        out
+    }
+    fn __debug__(&self) -> String {
+        format!("{:?}", self)
+    }
+    fn name(&self) -> String {
+        "Untyped Lambda Calculus".to_string()
     }
 }
 
-fn print_tokenize_error(err: TokenizeError, input: &str) {
-    println!("Error: {}", err.message);
+fn tokenize_error_to_string(err: TokenizeError, input: &str) -> String {
+    let mut out = String::new();
+    out.push_str(format!("Error: {}\n", err.message).as_str());
 
     let (start, end) = (err.span.start, err.span.start + err.span.length);
 
-    let mut out = String::new();
     // Add input text
     out.push_str(CYAN);
     out.push_str(&input[..start]);
@@ -56,7 +64,7 @@ fn print_tokenize_error(err: TokenizeError, input: &str) {
     out.push_str(RED);
     out.push_str(&"^".repeat(err.span.length));
 
-    println!("{}", out);
+    out
 }
 
 #[derive(Debug)]
@@ -254,12 +262,12 @@ fn parse_err(message: &str, span: Span) -> ParseError {
     }
 }
 
-fn print_parse_error(err: ParseError, input: &str) {
-    println!("Error: {}", err.message);
+fn parse_error_to_string(err: ParseError, input: &str) -> String {
+    let mut out = String::new();
+    out.push_str(format!("Error: {}\n", err.message).as_str());
 
     let (start, end) = (err.span.start, err.span.start + err.span.length);
 
-    let mut out = String::new();
     // Add input text
     out.push_str(CYAN);
     out.push_str(&input[..start]);
@@ -274,7 +282,7 @@ fn print_parse_error(err: ParseError, input: &str) {
     out.push_str(RED);
     out.push_str(&"^".repeat(err.span.length));
 
-    println!("{}", out);
+    out
 }
 
 fn parse(tokens: &Vec<SToken>) -> Result<Term, ParseError> {
