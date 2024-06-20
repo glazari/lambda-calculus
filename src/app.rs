@@ -12,9 +12,9 @@ use ratatui::{
 };
 
 use crate::errors;
-use crate::tui;
-use crate::evaluator::Evaluator;
 use crate::evaluator::available_evaluators;
+use crate::evaluator::Evaluator;
+use crate::tui;
 
 pub fn app_main() -> Result<()> {
     errors::install_hooks()?;
@@ -31,6 +31,7 @@ pub struct App {
     current_input: String,
     history_input: Vec<String>,
     history_output: Vec<String>,
+    history_pick: usize,
     in_pick_state: bool,
 }
 
@@ -42,6 +43,7 @@ impl App {
             current_input: String::new(),
             history_input: Vec::new(),
             history_output: Vec::new(),
+            history_pick: 0,
             in_pick_state: true,
         }
     }
@@ -74,18 +76,35 @@ impl App {
             KeyModifiers::CONTROL => match key_event.code {
                 KeyCode::Char('d') => self.exit(),
                 KeyCode::Char('c') => self.exit(),
+                KeyCode::Char('u') => self.current_input.clear(),
+                KeyCode::Char('l') => {
+                    self.history_input.clear();
+                    self.history_output.clear();
+                }
                 _ => {}
             },
             _ => match key_event.code {
                 KeyCode::Enter => {
                     self.execute_input(self.current_input.to_string());
                     self.current_input.clear();
+                    self.history_pick = 0;
                 }
                 KeyCode::Backspace => {
                     self.current_input.pop();
                 }
                 KeyCode::Char(c) => {
                     self.current_input.push(c);
+                }
+                KeyCode::Up => {
+                    //self.current_input = "asdfsadfasdfasdfsd----up".to_string();
+                    self.history_pick = self.history_pick.saturating_add(1);
+                    self.history_pick = self.history_pick.min(self.history_input.len());
+                    self.current_input = self.get_input_from_history();
+                }
+                KeyCode::Down => {
+                    //self.current_input = "asdfsadfasdfasdfsd".to_string();
+                    self.history_pick = self.history_pick.saturating_sub(1);
+                    self.current_input = self.get_input_from_history();
                 }
                 _ => {}
             },
@@ -94,11 +113,24 @@ impl App {
         Ok(())
     }
 
+    fn get_input_from_history(&self) -> String {
+        if self.history_pick <= self.history_input.len() && self.history_pick > 0 {
+            self.history_input[self.history_input.len() - self.history_pick].clone()
+        } else {
+            String::new()
+        }
+    }
+
     fn execute_input(&mut self, input: String) {
         self.history_input.push(input.to_string());
         if self.in_pick_state {
-            let index = input.parse::<usize>().unwrap();
-            self.evaluator = match index {
+            let index = input.parse::<usize>();
+            if index.is_err() {
+                let msg = format!("Invalid input: {}\n{}", input, evaluator_pick_string());
+                self.history_output.push(msg);
+                return;
+            }
+            self.evaluator = match index.unwrap() {
                 1 => Box::new(UntypedArithmetic),
                 2 => Box::new(UntypedLambdaCalculus),
                 _ => return,
@@ -108,19 +140,7 @@ impl App {
             return;
         }
         if input == "change" {
-            let mut out = String::new();
-            out.push_str(CYAN);
-            out.push_str("Pick an evaluator:");
-            out.push_str(RESET);
-            out.push_str("\n");
-            let evaluators = available_evaluators();
-            for (i, evaluator) in evaluators.iter().enumerate() {
-                out.push_str(GREEN);
-                out.push_str(&format!("{}. ", i + 1));
-                out.push_str(RESET);
-                out.push_str(&evaluator.name());
-                out.push_str("\n");
-            }
+            let out = evaluator_pick_string();
             self.history_output.push(out);
             self.in_pick_state = true;
             return;
@@ -133,6 +153,23 @@ impl App {
     fn exit(&mut self) {
         self.exit = true;
     }
+}
+
+fn evaluator_pick_string() -> String {
+    let mut out = String::new();
+    out.push_str(CYAN);
+    out.push_str("Pick an evaluator:");
+    out.push_str(RESET);
+    out.push_str("\n");
+    let evaluators = available_evaluators();
+    for (i, evaluator) in evaluators.iter().enumerate() {
+        out.push_str(GREEN);
+        out.push_str(&format!("{}. ", i + 1));
+        out.push_str(RESET);
+        out.push_str(&evaluator.name());
+        out.push_str("\n");
+    }
+    out
 }
 
 impl Widget for &App {
@@ -167,6 +204,7 @@ impl Widget for &App {
         lines.push(Line::from(vec![
             PROMPT.to_string().green().bold().into(),
             self.current_input.clone().into(),
+            "█".to_string().slow_blink().into(),
         ]));
 
         let counter_text = Text::from(lines);
