@@ -1,6 +1,6 @@
 use crate::colors::*;
 use crate::untyped_arithmetic::UntypedArithmetic;
-use crate::untyped_lambda_calculus::UntypedLambdaCalculus;
+use crate::evaluator;
 use std::fmt::Debug;
 
 use color_eyre::{eyre::WrapErr, Result};
@@ -33,6 +33,7 @@ pub struct App {
     history_output: Vec<String>,
     history_pick: usize,
     in_pick_state: bool,
+    in_focus: bool,
 }
 
 impl App {
@@ -45,6 +46,7 @@ impl App {
             history_output: Vec::new(),
             history_pick: 0,
             in_pick_state: true,
+            in_focus: true,
         }
     }
     /// runs the application's main loop until the user quits
@@ -67,6 +69,16 @@ impl App {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => self
                 .handle_key_event(key_event)
                 .wrap_err_with(|| format!("handling key event failed:\n{key_event:#?}")),
+            Event::FocusGained => {
+                self.current_input = "focus gained".to_string();
+                self.in_focus = true;
+                Ok(())
+            }
+            Event::FocusLost => {
+                self.current_input = "focus lost".to_string();
+                self.in_focus = false;
+                Ok(())
+            }
             _ => Ok(()),
         }
     }
@@ -130,11 +142,16 @@ impl App {
                 self.history_output.push(msg);
                 return;
             }
-            self.evaluator = match index.unwrap() {
-                1 => Box::new(UntypedArithmetic),
-                2 => Box::new(UntypedLambdaCalculus),
-                _ => return,
+            let evaluator = evaluator::pick(index.unwrap());
+            self.evaluator = match evaluator { 
+                Err(e) => {
+                    let msg = format!("Error: {}\n{}", e, evaluator_pick_string());
+                    self.history_output.push(msg);
+                    return;
+                },
+                Ok(e) => e,
             };
+
             self.in_pick_state = false;
             self.history_output.push(self.evaluator.name());
             return;
@@ -201,10 +218,15 @@ impl Widget for &App {
                 .collect();
             lines.extend(o);
         }
+        let curosor = if self.in_focus {
+            "█".to_string().slow_blink().into()
+        } else {
+            "".to_string().into()
+        };
         lines.push(Line::from(vec![
             PROMPT.to_string().green().bold().into(),
             self.current_input.clone().into(),
-            "█".to_string().slow_blink().into(),
+            curosor,
         ]));
 
         let counter_text = Text::from(lines);

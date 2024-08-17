@@ -1,5 +1,14 @@
-use crate::colors::*;
 use crate::evaluator::Evaluator;
+use crate::parsing_utils::tok_err;
+use crate::parsing_utils::tokenize_error_to_string;
+use crate::parsing_utils::InputIterator;
+use crate::parsing_utils::SToken;
+use crate::parsing_utils::Span;
+use crate::parsing_utils::TokenizeError;
+use crate::parsing_utils::ParseError;
+use crate::parsing_utils::parse_err;
+use crate::parsing_utils::parse_error_to_string;
+
 
 use std::fmt::{self, Display, Formatter};
 
@@ -44,29 +53,6 @@ impl Evaluator for UntypedLambdaCalculus {
     }
 }
 
-fn tokenize_error_to_string(err: TokenizeError, input: &str) -> String {
-    let mut out = String::new();
-    out.push_str(format!("Error: {}\n", err.message).as_str());
-
-    let (start, end) = (err.span.start, err.span.start + err.span.length);
-
-    // Add input text
-    out.push_str(CYAN);
-    out.push_str(&input[..start]);
-    out.push_str(RED);
-    out.push_str(&input[start..end]);
-    out.push_str(CYAN);
-    out.push_str(&input[end..]);
-
-    // Add ^ marker
-    out.push_str("\n");
-    out.push_str(&" ".repeat(start));
-    out.push_str(RED);
-    out.push_str(&"^".repeat(err.span.length));
-
-    out
-}
-
 #[derive(Debug)]
 enum Term {
     Var(String),
@@ -84,7 +70,7 @@ impl Display for Term {
     }
 }
 
-fn  app(term: Term, param: Term) -> Term {
+fn app(term: Term, param: Term) -> Term {
     Term::App(Box::new(term), Box::new(param))
 }
 
@@ -113,97 +99,9 @@ impl Display for Token {
     }
 }
 
-#[derive(Debug)]
-struct SToken {
-    token: Token,
-    span: Span,
-}
 
-impl SToken {
-    pub fn new(token: Token, span: Span) -> SToken {
-        SToken { token, span }
-    }
-}
 
-impl Display for SToken {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{:?}", self.token)
-    }
-}
-
-pub struct InputIterator<'a> {
-    chars: std::iter::Peekable<std::str::Chars<'a>>,
-    offset: usize,
-}
-impl InputIterator<'_> {
-    pub fn new(input: &str) -> InputIterator {
-        InputIterator {
-            chars: input.chars().peekable(),
-            offset: 0,
-        }
-    }
-    pub fn peek(&mut self) -> Option<&char> {
-        self.chars.peek()
-    }
-    pub fn next(&mut self) -> Option<char> {
-        let c = self.chars.next();
-        if c.is_some() {
-            self.offset += 1;
-        }
-        c
-    }
-    pub fn offset(&self) -> usize {
-        self.offset
-    }
-
-    pub fn span(&self, length: usize) -> Span {
-        Span {
-            start: self.offset - length,
-            length,
-        }
-    }
-
-    pub fn stoken(&self, token: Token, length: usize) -> SToken {
-        SToken {
-            token,
-            span: self.span(length),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Span {
-    start: usize,
-    length: usize,
-}
-
-impl Span {
-    pub fn new(end: usize, length: usize) -> Span {
-        Span {
-            start: end - length,
-            length,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct TokenizeError {
-    message: String,
-    span: Span,
-}
-
-pub fn tok_err(message: &str, span: Span) -> TokenizeError {
-    TokenizeError {
-        message: message.to_string(),
-        span,
-    }
-}
-
-fn stoken(token: Token, span: Span) -> SToken {
-    SToken { token, span }
-}
-
-fn tokenize(input: &str) -> Result<Vec<SToken>, TokenizeError> {
+fn tokenize(input: &str) -> Result<Vec<SToken<Token>>, TokenizeError> {
     let mut tokens = Vec::new();
     let mut it = InputIterator::new(input);
     while let Some(&c) = it.peek() {
@@ -249,43 +147,8 @@ fn tokenize(input: &str) -> Result<Vec<SToken>, TokenizeError> {
     Ok(tokens)
 }
 
-#[derive(Debug)]
-struct ParseError {
-    message: String,
-    span: Span,
-}
 
-fn parse_err(message: &str, span: Span) -> ParseError {
-    ParseError {
-        message: message.to_string(),
-        span,
-    }
-}
-
-fn parse_error_to_string(err: ParseError, input: &str) -> String {
-    let mut out = String::new();
-    out.push_str(format!("Error: {}\n", err.message).as_str());
-
-    let (start, end) = (err.span.start, err.span.start + err.span.length);
-
-    // Add input text
-    out.push_str(CYAN);
-    out.push_str(&input[..start]);
-    out.push_str(RED);
-    out.push_str(&input[start..end]);
-    out.push_str(CYAN);
-    out.push_str(&input[end..]);
-
-    // Add ^ marker
-    out.push_str("\n");
-    out.push_str(&" ".repeat(start));
-    out.push_str(RED);
-    out.push_str(&"^".repeat(err.span.length));
-
-    out
-}
-
-fn parse(tokens: &Vec<SToken>) -> Result<Term, ParseError> {
+fn parse(tokens: &Vec<SToken<Token>>) -> Result<Term, ParseError> {
     let mut it = tokens.iter().peekable();
     parse_term(&mut it)
 }
@@ -296,7 +159,7 @@ enum Precedence {
     Lambda,
 }
 
-fn parse_term(it: &mut std::iter::Peekable<std::slice::Iter<SToken>>) -> Result<Term, ParseError> {
+fn parse_term(it: &mut std::iter::Peekable<std::slice::Iter<SToken<Token>>>) -> Result<Term, ParseError> {
     match it.peek() {
         None => Err(parse_err("Unexpected end of input", Span::new(0, 0))),
         Some(t) => match t.token {
@@ -308,7 +171,7 @@ fn parse_term(it: &mut std::iter::Peekable<std::slice::Iter<SToken>>) -> Result<
 }
 
 fn parse_abstraction(
-    it: &mut std::iter::Peekable<std::slice::Iter<SToken>>,
+    it: &mut std::iter::Peekable<std::slice::Iter<SToken<Token>>>,
 ) -> Result<Term, ParseError> {
     expect_token(it, Token::Lambda)?;
     let id = expect_identifier(it)?;
@@ -318,7 +181,7 @@ fn parse_abstraction(
 }
 
 fn parse_application(
-    it: &mut std::iter::Peekable<std::slice::Iter<SToken>>,
+    it: &mut std::iter::Peekable<std::slice::Iter<SToken<Token>>>,
 ) -> Result<Term, ParseError> {
     let id = expect_identifier(it)?;
     let mut exp = Term::Var(id);
@@ -341,7 +204,7 @@ fn parse_application(
 }
 
 fn expect_identifier(
-    it: &mut std::iter::Peekable<std::slice::Iter<SToken>>,
+    it: &mut std::iter::Peekable<std::slice::Iter<SToken<Token>>>,
 ) -> Result<String, ParseError> {
     match it.next() {
         None => Err(parse_err("Unexpected end of input", Span::new(0, 0))),
@@ -353,7 +216,7 @@ fn expect_identifier(
 }
 
 fn expect_token(
-    it: &mut std::iter::Peekable<std::slice::Iter<SToken>>,
+    it: &mut std::iter::Peekable<std::slice::Iter<SToken<Token>>>,
     expected: Token,
 ) -> Result<(), ParseError> {
     match it.next() {

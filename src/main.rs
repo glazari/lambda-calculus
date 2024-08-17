@@ -4,6 +4,8 @@ mod errors;
 mod tui;
 mod untyped_arithmetic;
 mod untyped_lambda_calculus;
+mod parsing_utils;
+mod lisp;
 mod evaluator;
 
 use colors::*;
