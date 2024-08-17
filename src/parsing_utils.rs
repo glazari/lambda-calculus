@@ -59,6 +59,10 @@ pub struct SToken<T> {
     pub span: Span,
 }
 
+pub fn strip_spans<T>(tokens: Vec<SToken<T>>) -> Vec<T> {
+    tokens.into_iter().map(|t| t.token).collect()
+}
+
 pub struct InputIterator<'a, T> {
     chars: std::iter::Peekable<std::str::Chars<'a>>,
     offset: usize,
@@ -106,6 +110,10 @@ impl<T> InputIterator<'_, T> {
     }
     pub fn push(&mut self, token: T, length: usize) {
         self.tokens.push(self.stoken(token, length));
+    }
+
+    pub fn tok_err(&self, message: &str, length: usize) -> TokenizeError {
+        tok_err(message, self.span(length))
     }
 }
 
