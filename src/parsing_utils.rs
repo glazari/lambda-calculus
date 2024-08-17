@@ -59,15 +59,17 @@ pub struct SToken<T> {
     pub span: Span,
 }
 
-pub struct InputIterator<'a> {
+pub struct InputIterator<'a, T> {
     chars: std::iter::Peekable<std::str::Chars<'a>>,
     offset: usize,
+    pub tokens: Vec<SToken<T>>
 }
-impl InputIterator<'_> {
-    pub fn new(input: &str) -> InputIterator {
+impl<T> InputIterator<'_, T> {
+    pub fn new(input: &str) -> InputIterator<T> {
         InputIterator {
             chars: input.chars().peekable(),
             offset: 0,
+            tokens: Vec::new()
         }
     }
     pub fn peek(&mut self) -> Option<&char> {
@@ -91,11 +93,19 @@ impl InputIterator<'_> {
         }
     }
 
-    pub fn stoken<T>(&self, token: T, length: usize) -> SToken<T> {
+    pub fn stoken(&self, token: T, length: usize) -> SToken<T> {
         SToken {
             token,
             span: self.span(length),
         }
+    }
+
+    pub fn next_and_push(&mut self, token: T, length: usize) {
+        self.next();
+        self.tokens.push(self.stoken(token, length));
+    }
+    pub fn push(&mut self, token: T, length: usize) {
+        self.tokens.push(self.stoken(token, length));
     }
 }
 

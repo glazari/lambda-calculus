@@ -102,26 +102,13 @@ impl Display for Token {
 
 
 fn tokenize(input: &str) -> Result<Vec<SToken<Token>>, TokenizeError> {
-    let mut tokens = Vec::new();
     let mut it = InputIterator::new(input);
     while let Some(&c) = it.peek() {
         match c {
-            'λ' | '\\' => {
-                it.next();
-                tokens.push(it.stoken(Token::Lambda, 1));
-            }
-            '.' => {
-                it.next();
-                tokens.push(it.stoken(Token::Dot, 1));
-            }
-            '(' => {
-                it.next();
-                tokens.push(it.stoken(Token::LParen, 1));
-            }
-            ')' => {
-                it.next();
-                tokens.push(it.stoken(Token::RParen, 1));
-            }
+            'λ' | '\\' => it.next_and_push(Token::Lambda, 1),
+            '.' => it.next_and_push(Token::Dot, 1),
+            '(' => it.next_and_push(Token::LParen, 1),
+            ')' => it.next_and_push(Token::RParen, 1),
             c if c.is_whitespace() => {
                 it.next();
             }
@@ -135,8 +122,8 @@ fn tokenize(input: &str) -> Result<Vec<SToken<Token>>, TokenizeError> {
                         break;
                     }
                 }
-                let s = Span::new(it.offset(), identifier.len());
-                tokens.push(SToken::new(Token::Identifier(identifier), s));
+                let len = identifier.len();
+                it.push(Token::Identifier(identifier), len);
             }
             _ => {
                 it.next();
@@ -144,7 +131,7 @@ fn tokenize(input: &str) -> Result<Vec<SToken<Token>>, TokenizeError> {
             }
         }
     }
-    Ok(tokens)
+    Ok(it.tokens)
 }
 
 
