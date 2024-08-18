@@ -1,7 +1,9 @@
 use crate::parsing_utils::tok_err;
 use crate::parsing_utils::InputIterator;
-use crate::parsing_utils::SToken;
+use crate::parsing_utils::Spanned;
 use crate::parsing_utils::TokenizeError;
+
+pub(super) type SToken = Spanned<Token>;
 
 #[derive(Debug, PartialEq)]
 pub(super) enum Token {
@@ -27,7 +29,7 @@ pub(super) enum Token {
     Whitespace(String),
 }
 
-pub(super) fn tokenize(input: &str) -> Result<Vec<SToken<Token>>, TokenizeError> {
+pub(super) fn tokenize(input: &str) -> Result<Vec<SToken>, TokenizeError> {
     let mut it = InputIterator::new(input);
     while let Some(c) = it.peek() {
         match c {
@@ -153,13 +155,14 @@ fn tokenize_comment(it: &mut InputIterator<Token>) {
     it.push(Token::Comment(comment), len);
 }
 
-fn s(string: &str) -> String {
-    string.to_string()
-}
-
+#[cfg(test)]
 mod test {
     use super::*;
     use crate::parsing_utils::strip_spans;
+
+    fn s(string: &str) -> String {
+        string.to_string()
+    }
 
     #[test]
     fn test_tokenize() {

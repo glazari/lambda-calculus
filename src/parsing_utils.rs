@@ -15,6 +15,15 @@ impl Span {
             length,
         }
     }
+
+    pub fn merge(spans: &[Span]) -> Span {
+        let start = spans.iter().map(|s| s.start).min().unwrap();
+        let end = spans.iter().map(|s| s.start + s.length).max().unwrap();
+        Span {
+            start,
+            length: end - start,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -54,19 +63,20 @@ pub fn tok_err(message: &str, span: Span) -> TokenizeError {
 }
 
 #[derive(Debug)]
-pub struct SToken<T> {
-    pub token: T,
+pub struct Spanned<T> {
+    pub item: T,
     pub span: Span,
 }
 
-pub fn strip_spans<T>(tokens: Vec<SToken<T>>) -> Vec<T> {
-    tokens.into_iter().map(|t| t.token).collect()
+#[cfg(test)]
+pub fn strip_spans<T>(tokens: Vec<Spanned<T>>) -> Vec<T> {
+    tokens.into_iter().map(|t| t.item).collect()
 }
 
 pub struct InputIterator<'a, T> {
     chars: std::iter::Peekable<std::str::Chars<'a>>,
     offset: usize,
-    pub tokens: Vec<SToken<T>>
+    pub tokens: Vec<Spanned<T>>
 }
 impl<T> InputIterator<'_, T> {
     pub fn new(input: &str) -> InputIterator<T> {
@@ -97,9 +107,9 @@ impl<T> InputIterator<'_, T> {
         }
     }
 
-    pub fn stoken(&self, token: T, length: usize) -> SToken<T> {
-        SToken {
-            token,
+    pub fn stoken(&self, token: T, length: usize) -> Spanned<T> {
+        Spanned {
+            item: token,
             span: self.span(length),
         }
     }
@@ -117,21 +127,21 @@ impl<T> InputIterator<'_, T> {
     }
 }
 
-impl<T> SToken<T> {
-    pub fn new(token: T, span: Span) -> SToken<T> {
-        SToken { token, span }
+impl<T> Spanned<T> {
+    pub fn new(token: T, span: Span) -> Spanned<T> {
+        Spanned { item: token, span }
     }
 }
 
-impl<T: Debug> Display for SToken<T> {
+impl<T: Debug> Display for Spanned<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{:?}", self.token)
+        write!(f, "{:?}", self.item)
     }
 }
 
 
-pub fn stoken<T>(token: T, span: Span) -> SToken<T> {
-    SToken { token, span }
+pub fn stoken<T>(token: T, span: Span) -> Spanned<T> {
+    Spanned { item: token, span }
 }
 
 

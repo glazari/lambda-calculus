@@ -2,7 +2,7 @@ use crate::evaluator::Evaluator;
 use crate::parsing_utils::tok_err;
 use crate::parsing_utils::tokenize_error_to_string;
 use crate::parsing_utils::InputIterator;
-use crate::parsing_utils::SToken;
+use crate::parsing_utils::Spanned;
 use crate::parsing_utils::Span;
 use crate::parsing_utils::TokenizeError;
 use crate::parsing_utils::ParseError;
@@ -101,7 +101,7 @@ impl Display for Token {
 
 
 
-fn tokenize(input: &str) -> Result<Vec<SToken<Token>>, TokenizeError> {
+fn tokenize(input: &str) -> Result<Vec<Spanned<Token>>, TokenizeError> {
     let mut it = InputIterator::new(input);
     while let Some(&c) = it.peek() {
         match c {
@@ -135,7 +135,7 @@ fn tokenize(input: &str) -> Result<Vec<SToken<Token>>, TokenizeError> {
 }
 
 
-fn parse(tokens: &Vec<SToken<Token>>) -> Result<Term, ParseError> {
+fn parse(tokens: &Vec<Spanned<Token>>) -> Result<Term, ParseError> {
     let mut it = tokens.iter().peekable();
     parse_term(&mut it)
 }
@@ -146,10 +146,10 @@ enum Precedence {
     Lambda,
 }
 
-fn parse_term(it: &mut std::iter::Peekable<std::slice::Iter<SToken<Token>>>) -> Result<Term, ParseError> {
+fn parse_term(it: &mut std::iter::Peekable<std::slice::Iter<Spanned<Token>>>) -> Result<Term, ParseError> {
     match it.peek() {
         None => Err(parse_err("Unexpected end of input", Span::new(0, 0))),
-        Some(t) => match t.token {
+        Some(t) => match t.item {
             Token::Identifier(_) => parse_application(it),
             Token::Lambda => parse_abstraction(it),
             _ => Err(parse_err("Unexpected token", t.span)),
@@ -158,7 +158,7 @@ fn parse_term(it: &mut std::iter::Peekable<std::slice::Iter<SToken<Token>>>) -> 
 }
 
 fn parse_abstraction(
-    it: &mut std::iter::Peekable<std::slice::Iter<SToken<Token>>>,
+    it: &mut std::iter::Peekable<std::slice::Iter<Spanned<Token>>>,
 ) -> Result<Term, ParseError> {
     expect_token(it, Token::Lambda)?;
     let id = expect_identifier(it)?;
@@ -168,12 +168,12 @@ fn parse_abstraction(
 }
 
 fn parse_application(
-    it: &mut std::iter::Peekable<std::slice::Iter<SToken<Token>>>,
+    it: &mut std::iter::Peekable<std::slice::Iter<Spanned<Token>>>,
 ) -> Result<Term, ParseError> {
     let id = expect_identifier(it)?;
     let mut exp = Term::Var(id);
     while let Some(t) = it.peek() {
-        match t.token {
+        match t.item {
             Token::Identifier(_) => {
                 let id = expect_identifier(it)?;
                 let term = Term::Var(id);
@@ -191,11 +191,11 @@ fn parse_application(
 }
 
 fn expect_identifier(
-    it: &mut std::iter::Peekable<std::slice::Iter<SToken<Token>>>,
+    it: &mut std::iter::Peekable<std::slice::Iter<Spanned<Token>>>,
 ) -> Result<String, ParseError> {
     match it.next() {
         None => Err(parse_err("Unexpected end of input", Span::new(0, 0))),
-        Some(t) => match &t.token {
+        Some(t) => match &t.item {
             Token::Identifier(id) => Ok(id.clone()),
             _ => Err(parse_err("Expected identifier", t.span)),
         },
@@ -203,16 +203,16 @@ fn expect_identifier(
 }
 
 fn expect_token(
-    it: &mut std::iter::Peekable<std::slice::Iter<SToken<Token>>>,
+    it: &mut std::iter::Peekable<std::slice::Iter<Spanned<Token>>>,
     expected: Token,
 ) -> Result<(), ParseError> {
     match it.next() {
         None => Err(parse_err("Unexpected end of input", Span::new(0, 0))),
         Some(t) => {
-            if t.token == expected {
+            if t.item == expected {
                 Ok(())
             } else {
-                let msg = format!("Unexpected token '{}', expected '{}'", t.token, expected);
+                let msg = format!("Unexpected token '{}', expected '{}'", t.item, expected);
                 Err(parse_err(&msg, t.span))
             }
         }

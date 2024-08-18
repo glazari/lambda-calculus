@@ -50,3 +50,46 @@ term ::= x
        | \x. term
        | term term
 ```
+
+
+# Lisp
+
+
+## Grammar
+
+```
+term ::= expression | fundef
+fundef ::= "(" "define" "(" function arglist ")" expression ")"
+arglist ::= "(" variable* ")"
+expression ::= value
+            | variable
+            | "(" "if" expression expression expression ")"
+            | "(" "define" variable expression ")"
+            | "(" optr expression* ")"
+            | "(" "lambda" arglist expression ")"
+optr ::= function | value-op
+value ::= number | quoted-const
+quoted-const ::= "'"S-expr
+S-expr ::= number | simbol | "(" S-expr* ")"
+value-op := "+" 
+        | "-" 
+        | "*" 
+        | "/" 
+        | "<" 
+        | ">"
+        | "="
+        | "print"
+        | "cons"
+        | "car"
+        | "cdr"
+        | "null?"
+        | "number?"
+        | "list?"
+        | "eq?" 
+function := identifier
+variable := identifier
+number := "-"? digit+
+identifier := letter (letter | digit)*
+
+        
+```
